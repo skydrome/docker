@@ -1,0 +1,44 @@
+diff --git a/configure b/configure
+index 9a03c9c..e1f5546 100755
+--- a/configure
++++ b/configure
+@@ -8354,7 +8354,7 @@ rm -rf conftest*
+   # Check for b64_ntop. If we have b64_ntop, we assume b64_pton as well.
+   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for b64_ntop" >&5
+ printf %s "checking for b64_ntop... " >&6; }
+-  if test "$cross_compiling" = yes
++  if test "$cross_compiling" = no
+ then :
+   { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+ printf "%s\n" "$as_me: error: in \`$ac_pwd':" >&2;}
+@@ -8395,7 +8395,7 @@ printf "%s\n" "no" >&6; }
+ printf %s "checking for b64_ntop with -lresolv... " >&6; }
+     OLD_LIBS="$LIBS"
+     LIBS="$LIBS -lresolv"
+-    if test "$cross_compiling" = yes
++    if test "$cross_compiling" = no
+ then :
+   { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+ printf "%s\n" "$as_me: error: in \`$ac_pwd':" >&2;}
+@@ -8437,7 +8437,7 @@ printf "%s\n" "no" >&6; }
+ printf %s "checking for b64_ntop with -lnetwork... " >&6; }
+       OLD_LIBS="$LIBS"
+       LIBS="-lnetwork"
+-      if test "$cross_compiling" = yes
++      if test "$cross_compiling" = no
+ then :
+   { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+ printf "%s\n" "$as_me: error: in \`$ac_pwd':" >&2;}
+diff --git a/configure.ac b/configure.ac
+index b73a9ab..ede4597 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -180,7 +180,7 @@ dnl If we are cross-compiling, make a note of it so we can skip some tests in th
+ AS_IF([test "$cross_compiling" = "yes"], [
+ 	EGG_CROSS_COMPILING=yes
+ ], [
+-	EGG_CROSS_COMPILING=no
++	EGG_CROSS_COMPILING=yes
+ ])
+ AC_SUBST(EGG_CROSS_COMPILING)
+ 
