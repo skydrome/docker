@@ -1,10 +1,11 @@
 # syntax=docker/dockerfile:1
 
-ARG ALPINE_VERSION=3.22
+ARG ALPINE_VERSION=3.23
 
 # https://sourceforge.net/projects/tcl/files/Tcl
-ARG TCL_VER=9.0.2
+ARG TCL_VER=9.0.3
 ARG TCL_MAJOR=9.0
+ARG LLVM=21
 
 ARG CC=clang
 ARG CCWARN="-Wno-deprecated-non-prototype"
@@ -15,7 +16,7 @@ FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx
 FROM --platform=$BUILDPLATFORM alpine:$ALPINE_VERSION AS cross_builder
 COPY --link --from=xx / /
 
-ARG BUILDPLATFORM TARGETPLATFORM TARGETOS TARGETARCH TARGETVARIANT TCL_VER TCL_MAJOR
+ARG BUILDPLATFORM TARGETPLATFORM TARGETOS TARGETARCH TARGETVARIANT TCL_VER TCL_MAJOR LLVM
 #    linux/amd64   linux/arm/v7   linux      arm         v7
 ENV BUILDPLATFORM=$BUILDPLATFORM
 ENV TARGETPLATFORM=$TARGETPLATFORM
@@ -51,8 +52,8 @@ set -ex
     xx-clang --setup-target-triple
     xx-info env
 
-    cd /usr/lib/llvm20/lib/clang/20/lib/$SYSROOT
-    ln -s /$SYSROOT/usr/lib/llvm20/lib/clang/20/lib/$SYSROOT/libclang_rt.builtins-armhf.a libclang_rt.builtins.a
+    cd /usr/lib/llvm${LLVM}/lib/clang/${LLVM}/lib/$SYSROOT
+    ln -s /$SYSROOT/usr/lib/llvm${LLVM}/lib/clang/${LLVM}/lib/$SYSROOT/libclang_rt.builtins-armhf.a libclang_rt.builtins.a
 EOF
 
 ADD "src/tcl${TCL_VER}-src.tar.gz" .
@@ -79,12 +80,12 @@ EOF
 RUN <<EOF
 set -ex
 cd /opt/usr
-    cd    bin && ln -sf tclsh$TCL_MAJOR tclsh
+    cd    bin && ln -sf  tclsh${TCL_MAJOR}    tclsh
     cd ../lib && ln -sf libtcl${TCL_MAJOR}.so libtcl.so
     rm -r /opt/usr/share
 
     sed -e "s|'/usr'|'/opt/usr'|" \
-        -e "s|/src/tcl9.0.2/unix|/opt/usr/lib|" \
+        -e "s|/src/tcl${TCL_VER}/unix|/opt/usr/lib|" \
         -e "s|/usr/lib|/opt/usr/lib|" \
         -e "s|/usr/include|/opt/usr/include|" \
         -i "/opt/usr/lib/tclConfig.sh"
@@ -115,22 +116,21 @@ cd eggdrop
 EOF
 
 ADD --keep-git-dir=true \
-    "https://github.com/bohagan1/TclTLS.git#2f4773d9479440ab5f087a3b62c658ad747df4fe" tls
+    "https://github.com/bohagan1/TclTLS.git#71febc87879bb3c2686568a5af1d1c865ebe4d5d" tls
 RUN <<EOF
 set -ex
 cd tls
     ./configure \
         --host=$SYSROOT --build=$BUILDHOST \
         --prefix=/usr --exec-prefix=/opt/usr \
-        --enable-ssl-fastpath \
-        --disable-ssl3 --disable-tls1 --disable-tls1_1
+        --enable-ssl-fastpath --disable-ssl3 --disable-tls1 --disable-tls1_1
 
     make binaries libraries
     make install-binaries install-libraries
 EOF
 
 ADD --keep-git-dir=true \
-    "https://github.com/chpock/tdom.git#d98d4021f818d4a5be4734793f4a536dbbc93233" tdom
+    "https://github.com/chpock/tdom.git#19d1d7b258588df3257938296f9c59eee561e4fb" tdom
 RUN <<EOF
 set -ex
 cd tdom
@@ -197,6 +197,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
         ca-certificates \
         coreutils \
         dropbear \
+        lscpu \
         mimalloc2 \
         procps \
         python3 \
@@ -229,8 +230,7 @@ RUN <<EOF
         /lib/{sysctl.d,modules*,firmware} \
         /sbin/*disk \
         /eggdrop/modules-*/{filesys,share,notes,seen,assoc,uptime,ident,compress}.so \
-        /eggdrop/scripts/{weed,sentinel.tcl,auto*} \
-        /eggdrop/{doc,language/*{dan,fin,fre,ger,ita,por}*} \
+        /eggdrop/{doc,scripts,language/*{dan,fin,fre,ger,ita,por}*} \
         /sbin/{hwclock,zramctl,*swap*,fsck*,mkfs*,blk*} \
         /usr/include \
         /usr/lib/*.a \

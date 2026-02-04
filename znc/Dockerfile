@@ -1,6 +1,10 @@
 # syntax=docker/dockerfile:1
 
-ARG ALPINE_VERSION=3.22
+# TODO
+# https://github.com/microsoft/mimalloc
+
+ARG ALPINE_VERSION=3.23
+ARG LLVM=21
 
 ARG CCWARN="-Wno-deprecated-non-prototype -Wno-deprecated-declarations"
 ARG CXXFLAGS="-O3 -pipe -fomit-frame-pointer -flto -DNDEBUG ${CCWARN}"
@@ -10,7 +14,7 @@ FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx
 FROM --platform=$BUILDPLATFORM alpine:$ALPINE_VERSION AS builder
 COPY --link --from=xx / /
 
-ARG BUILDPLATFORM TARGETPLATFORM TARGETOS TARGETARCH TARGETVARIANT
+ARG BUILDPLATFORM TARGETPLATFORM TARGETOS TARGETARCH TARGETVARIANT LLVM
 #    linux/amd64   linux/arm/v7   linux      arm         v7
 ENV BUILDPLATFORM=$BUILDPLATFORM
 ENV TARGETPLATFORM=$TARGETPLATFORM
@@ -46,8 +50,8 @@ set -ex
     xx-info env
     env
 
-    cd /usr/lib/llvm20/lib/clang/20/lib/$SYSROOT
-    ln -s /$SYSROOT/usr/lib/llvm20/lib/clang/20/lib/$SYSROOT/libclang_rt.builtins-armhf.a libclang_rt.builtins.a
+    cd /usr/lib/llvm${LLVM}/lib/clang/${LLVM}/lib/$SYSROOT
+    ln -s /$SYSROOT/usr/lib/llvm${LLVM}/lib/clang/${LLVM}/lib/$SYSROOT/libclang_rt.builtins-armhf.a libclang_rt.builtins.a
 EOF
 
 ADD --keep-git-dir=true --chmod=777 \

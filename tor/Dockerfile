@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 
-ARG ALPINE_VERSION=3.22
+ARG ALPINE_VERSION=3.23
+ARG LLVM=21
 
 ARG CC=xx-clang
 ARG CCWARN="-Wno-deprecated-non-prototype -Wno-shorten-64-to-32 -Wno-format"
@@ -11,7 +12,7 @@ FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx
 FROM --platform=$BUILDPLATFORM alpine:$ALPINE_VERSION AS builder
 COPY --link --from=xx / /
 
-ARG BUILDPLATFORM TARGETPLATFORM TARGETOS TARGETARCH TARGETVARIANT
+ARG BUILDPLATFORM TARGETPLATFORM TARGETOS TARGETARCH TARGETVARIANT LLVM
 #    linux/amd64   linux/arm/v7   linux      arm         v7
 ENV BUILDPLATFORM=$BUILDPLATFORM
 ENV TARGETPLATFORM=$TARGETPLATFORM
@@ -45,22 +46,20 @@ RUN <<EOF
 set -ex
     xx-clang --setup-target-triple
     xx-info env
-    env
 
-    cd /usr/lib/llvm20/lib/clang/20/lib/$SYSROOT
-    ln -s /$SYSROOT/usr/lib/llvm20/lib/clang/20/lib/$SYSROOT/libclang_rt.builtins-armhf.a libclang_rt.builtins.a
+    cd /usr/lib/llvm${LLVM}/lib/clang/${LLVM}/lib/$SYSROOT
+    ln -s /$SYSROOT/usr/lib/llvm${LLVM}/lib/clang/${LLVM}/lib/$SYSROOT/libclang_rt.builtins-armhf.a libclang_rt.builtins.a
 EOF
 
-ADD "https://github.com/technion/libscrypt.git" scrypt
-
-RUN <<EOF
-set -ex
-cd scrypt
-    CFLAGS_EXTRA=$CFLAGS LDFLAGS_EXTRA=$LDFLAGS make -j$(nproc)
-    PREFIX=/$SYSROOT/usr make install install-static
-    PREFIX=/opt/usr make install
-    tree /opt/usr
-EOF
+#ADD "https://github.com/technion/libscrypt.git" scrypt
+#RUN <<EOF
+#set -ex
+#cd scrypt
+#    CFLAGS_EXTRA=$CFLAGS LDFLAGS_EXTRA=$LDFLAGS make -j$(nproc)
+#    PREFIX=/$SYSROOT/usr make install install-static
+#    PREFIX=/opt/usr make install
+#    tree /opt/usr
+#EOF
 
 ADD --keep-git-dir=true "https://gitlab.torproject.org/tpo/core/tor.git#maint-0.4.8" tor
 
@@ -86,7 +85,7 @@ cd tor
         --disable-systemd \
         --disable-unittests \
         --enable-gpl \
-        --enable-libscrypt \
+        --disable-libscrypt \
         --enable-lzma \
         --enable-module-pow \
         --enable-pic \
@@ -129,7 +128,7 @@ EOF
 COPY --link entrypoint.sh /
 
 RUN <<EOF
-    rm -r \
+    rm -rf \
         /etc/modprobe.d \
         /etc/network \
         /home \
