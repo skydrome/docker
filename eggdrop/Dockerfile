@@ -116,7 +116,7 @@ cd eggdrop
 EOF
 
 ADD --keep-git-dir=true \
-    "https://github.com/bohagan1/TclTLS.git#71febc87879bb3c2686568a5af1d1c865ebe4d5d" tls
+    "https://github.com/bohagan1/TclTLS.git#c38d91bf54beba87dbf32e5e414d070ff81cf342" tls
 RUN <<EOF
 set -ex
 cd tls
@@ -199,12 +199,12 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
         dropbear \
         lscpu \
         mimalloc2 \
+        nano \
         procps \
         python3 \
-        nano \
         su-exec \
-        util-linux-misc \
         tini \
+        util-linux-misc \
         zlib
 
     # apk add ncdu libtree
@@ -223,7 +223,7 @@ ARG TCL_MAJOR
 RUN <<EOF
     PYTHON_VER=$(python -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
 
-    rm -r \
+    rm -rf \
         /etc/terminfo/{s,v,k,g,d} \
         /etc/{modprobe.d,network,udhcpd.conf,periodic} \
         /{home,media,mnt,opt,srv} \
