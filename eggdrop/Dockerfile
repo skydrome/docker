@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1
 
-ARG ALPINE_VERSION=3.23
+ARG ALPINE_VERSION=3.24
 
 # https://sourceforge.net/projects/tcl/files/Tcl
 ARG TCL_VER=9.0.3
 ARG TCL_MAJOR=9.0
-ARG LLVM=21
+ARG LLVM=22
 
 ARG CC=clang
 ARG CCWARN="-Wno-deprecated-non-prototype"
@@ -116,7 +116,7 @@ cd eggdrop
 EOF
 
 ADD --keep-git-dir=true \
-    "https://github.com/bohagan1/TclTLS.git#c38d91bf54beba87dbf32e5e414d070ff81cf342" tls
+    "https://github.com/bohagan1/TclTLS.git#3e108fcf6674bc004249b19e312d20ff7ed2124f" tls
 RUN <<EOF
 set -ex
 cd tls

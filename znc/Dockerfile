@@ -3,11 +3,11 @@
 # TODO
 # https://github.com/microsoft/mimalloc
 
-ARG ALPINE_VERSION=3.23
-ARG LLVM=21
+ARG ALPINE_VERSION=3.24
+ARG LLVM=22
 
 ARG CCWARN="-Wno-deprecated-non-prototype -Wno-deprecated-declarations"
-ARG CXXFLAGS="-O3 -pipe -fomit-frame-pointer -flto -DNDEBUG ${CCWARN}"
+ARG CXXFLAGS="-O3 -pipe -fomit-frame-pointer -flto -stdlib=libc++ -DNDEBUG ${CCWARN}"
 ARG LDFLAGS="-fuse-ld=mold -rtlib=compiler-rt -unwindlib=libunwind -flto -Wl,-O2,--gc-sections,--strip-all,--as-needed,--sort-common -Wl,-z,relro -Wl,-z,now"
 
 FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx
@@ -31,13 +31,13 @@ RUN --mount=type=cache,target=/var/cache/apk <<EOF
 set -ex
     apk upgrade --update-cache
     apk add \
-       compiler-rt clang cmake git lld llvm llvm-libunwind-dev \
+       libc++-dev compiler-rt clang cmake git lld llvm llvm-libunwind-dev \
        make mold patch pkgconf tree
 EOF
 RUN --mount=type=cache,target=/var/cache/apk <<EOF
 set -ex
     xx-apk add \
-        g++ musl-dev compiler-rt llvm-libunwind-dev \
+        g++ libc++-dev musl-dev compiler-rt llvm-libunwind-dev \
         argon2-dev cyrus-sasl-dev openssl-dev zlib-dev
 EOF
 
@@ -58,7 +58,7 @@ ADD --keep-git-dir=true --chmod=777 \
     "https://github.com/znc/znc.git" znc
 ADD "https://github.com/Cizzle/znc-autoinvitejoin.git" znc-autoinvitejoin
 ADD "https://github.com/CyberShadow/znc-clientbuffer.git" znc-clientbuffer
-ADD "https://github.com/qnorsten/znc-fish.git" znc-fish
+ADD "https://github.com/ZarTek-Creole/mod-znc-fish.git" znc-fish
 
 RUN <<EOF
 set -ex
@@ -79,7 +79,7 @@ cd ..
         -DWANT_ICU=OFF \
         -DWANT_OPENSSL=ON \
         -DWANT_ZLIB=ON \
-    .
+    . || cat build/CMakeFiles/CMakeError.log
 
     cmake --build build --parallel $(nproc)
     DESTDIR=/opt cmake --install build
@@ -109,7 +109,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
         argon2-libs \
         ca-certificates \
         libssl3 \
-        libstdc++ \
+        libc++ \
         llvm-libunwind \
         mimalloc2 \
         su-exec \

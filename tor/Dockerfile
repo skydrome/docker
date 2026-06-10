@@ -1,12 +1,13 @@
 # syntax=docker/dockerfile:1
 
-ARG ALPINE_VERSION=3.23
-ARG LLVM=21
+ARG ALPINE_VERSION=3.24
+ARG LLVM=22
 
 ARG CC=xx-clang
 ARG CCWARN="-Wno-deprecated-non-prototype -Wno-shorten-64-to-32 -Wno-format"
 ARG CFLAGS="-O3 -pipe -march=armv7-a -mtune=cortex-a15 -mfpu=neon-vfpv4 -mfloat-abi=hard -fomit-frame-pointer -flto ${CCWARN}"
 ARG LDFLAGS="-fuse-ld=mold -flto -rtlib=compiler-rt -Wl,-O2,--gc-sections,--strip-all,--as-needed,--sort-common -Wl,-z,relro -Wl,-z,now"
+ARG RUSTFLAGS="-C target-cpu=cortex-a15 -C linker-plugin-lto -C link-arg=-fuse-ld=lld"
 
 FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx
 FROM --platform=$BUILDPLATFORM alpine:$ALPINE_VERSION AS builder
@@ -30,39 +31,29 @@ set -ex
     apk upgrade --update-cache
     apk add \
         autoconf autoconf-archive automake clang libtool make patch pkgconf tree \
-        git lld llvm mold
+        git lld llvm mold rust cargo
 EOF
 RUN --mount=type=cache,target=/var/cache/apk <<EOF
 set -ex
     xx-apk add --no-scripts \
         gcc musl-dev zlib-dev compiler-rt \
-        jemalloc-dev libcap-dev libevent-dev libgcrypt-dev libseccomp-dev openssl-dev xz-dev  zstd-dev
+        jemalloc-dev libcap-dev libevent-dev libgcrypt-dev libseccomp-dev openssl-dev xz-dev zstd-dev sqlite-dev
 EOF
 
-ARG CC CFLAGS LDFLAGS
-ENV CC=$CC CFLAGS=$CFLAGS LDFLAGS=$LDFLAGS
+ARG CC CFLAGS LDFLAGS RUSTFLAGS
+ENV CC=$CC CFLAGS=$CFLAGS LDFLAGS=$LDFLAGS RUSTFLAGS=$RUSTFLAGS
 
 RUN <<EOF
 set -ex
     xx-clang --setup-target-triple
+    xx-cargo --print-target-triple
     xx-info env
 
     cd /usr/lib/llvm${LLVM}/lib/clang/${LLVM}/lib/$SYSROOT
     ln -s /$SYSROOT/usr/lib/llvm${LLVM}/lib/clang/${LLVM}/lib/$SYSROOT/libclang_rt.builtins-armhf.a libclang_rt.builtins.a
 EOF
 
-#ADD "https://github.com/technion/libscrypt.git" scrypt
-#RUN <<EOF
-#set -ex
-#cd scrypt
-#    CFLAGS_EXTRA=$CFLAGS LDFLAGS_EXTRA=$LDFLAGS make -j$(nproc)
-#    PREFIX=/$SYSROOT/usr make install install-static
-#    PREFIX=/opt/usr make install
-#    tree /opt/usr
-#EOF
-
-ADD --keep-git-dir=true "https://gitlab.torproject.org/tpo/core/tor.git#maint-0.4.8" tor
-
+ADD --keep-git-dir=true "https://gitlab.torproject.org/tpo/core/tor.git#maint-0.4.9" tor
 RUN <<EOF
 set -ex
 cd tor
@@ -102,6 +93,19 @@ cd tor
     tree /opt/usr
 EOF
 
+ADD --keep-git-dir=true "https://gitlab.torproject.org/tpo/core/arti.git#arti-v2.4.0" arti
+RUN <<EOF
+cd arti
+    cargo fetch
+EOF
+RUN <<EOF
+set -ex
+cd arti
+    xx-cargo build --jobs $(nproc) --locked --target $SYSROOT \
+        -p arti --release --features full,accel-openssl
+    xx-verify target/$SYSROOT/release/arti
+    install -Dm755 target/$SYSROOT/release/arti /opt/usr/bin/arti
+EOF
 
 FROM arm32v7/alpine:$ALPINE_VERSION
 COPY --from=builder /opt/usr /usr
@@ -115,6 +119,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
         libseccomp \
         libssl3 \
         netcat-openbsd \
+        sqlite-libs \
         su-exec \
         tini \
         xz-libs \
@@ -143,7 +148,8 @@ RUN <<EOF
         /var/spool
 
     adduser -D -S -h /var/lib/tor tor
-    tor --version
+    tor  --version
+    arti --version
 EOF
 
 USER tor
