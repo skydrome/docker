@@ -116,7 +116,7 @@ cd eggdrop
 EOF
 
 ADD --keep-git-dir=true \
-    "https://github.com/bohagan1/TclTLS.git#3e108fcf6674bc004249b19e312d20ff7ed2124f" tls
+    "https://github.com/bohagan1/TclTLS.git#91d602d995b17da0fa358e4d19f824d938558997" tls
 RUN <<EOF
 set -ex
 cd tls
