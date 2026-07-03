@@ -26,14 +26,14 @@ ARG BUILDHOST=x86_64-alpine-linux-musl
 
 WORKDIR /src
 
-RUN --mount=type=cache,target=/var/cache/apk <<EOF
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
 set -ex
     apk upgrade --update-cache
     apk add \
         autoconf autoconf-archive automake clang libtool make patch pkgconf tree \
         git lld llvm mold rust cargo
 EOF
-RUN --mount=type=cache,target=/var/cache/apk <<EOF
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
 set -ex
     xx-apk add --no-scripts \
         gcc musl-dev zlib-dev compiler-rt \
@@ -94,13 +94,10 @@ cd tor
 EOF
 
 ADD --keep-git-dir=true "https://gitlab.torproject.org/tpo/core/arti.git#arti-v2.4.0" arti
-RUN <<EOF
-cd arti
-    cargo fetch
-EOF
-RUN <<EOF
+RUN --mount=type=cache,target=/root/.cargo <<EOF
 set -ex
 cd arti
+    cargo fetch --target $SYSROOT
     xx-cargo build --jobs $(nproc) --locked --target $SYSROOT \
         -p arti --release --features full,accel-openssl
     xx-verify target/$SYSROOT/release/arti
@@ -155,3 +152,6 @@ EOF
 USER tor
 VOLUME /tor-data
 ENTRYPOINT ["tini", "--", "/entrypoint.sh"]
+
+LABEL org.opencontainers.image.source="https://github.com/skydrome/docker/tree/master/tor"
+LABEL org.opencontainers.image.description="Tor/Arti arm32v7"

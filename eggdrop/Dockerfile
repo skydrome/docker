@@ -29,14 +29,14 @@ ARG BUILDHOST=x86_64-alpine-linux-musl
 
 WORKDIR /src
 
-RUN --mount=type=cache,target=/var/cache/apk <<EOF
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
 set -ex
     apk upgrade --update-cache
     apk add \
         autoconf autoconf-archive automake clang libtool make patch pkgconf tree \
         git lld llvm mold
 EOF
-RUN --mount=type=cache,target=/var/cache/apk <<EOF
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
 set -ex
     xx-apk add --no-scripts \
         gcc musl-dev zlib-dev compiler-rt \
@@ -152,7 +152,7 @@ COPY --from=cross_builder /opt /
 
 WORKDIR /src
 
-RUN --mount=type=cache,target=/var/cache/apk <<EOF
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
 set -ex
     apk upgrade --update-cache
     apk add \
@@ -274,3 +274,6 @@ EOF
 USER root
 VOLUME /eggdrop-data
 ENTRYPOINT ["tini", "--", "/entrypoint.sh"]
+
+LABEL org.opencontainers.image.source="https://github.com/skydrome/docker/tree/master/eggdrop"
+LABEL org.opencontainers.image.description="Eggdrop arm32v7"

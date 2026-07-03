@@ -27,14 +27,14 @@ ARG BUILDHOST=x86_64-alpine-linux-musl
 
 WORKDIR /src
 
-RUN --mount=type=cache,target=/var/cache/apk <<EOF
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
 set -ex
     apk upgrade --update-cache
     apk add \
        libc++-dev compiler-rt clang cmake git lld llvm llvm-libunwind-dev \
        make mold patch pkgconf tree
 EOF
-RUN --mount=type=cache,target=/var/cache/apk <<EOF
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
 set -ex
     xx-apk add \
         g++ libc++-dev musl-dev compiler-rt llvm-libunwind-dev \
@@ -144,3 +144,6 @@ EOF
 USER znc
 VOLUME /znc-data
 ENTRYPOINT ["tini", "--", "/entrypoint.sh"]
+
+LABEL org.opencontainers.image.source="https://github.com/skydrome/docker/tree/master/znc"
+LABEL org.opencontainers.image.description="ZNC arm32v7"
