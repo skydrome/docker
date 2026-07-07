@@ -3,7 +3,7 @@
 ARG ALPINE_VERSION=3.24
 
 # https://sourceforge.net/projects/tcl/files/Tcl
-ARG TCL_VER=9.0.3
+ARG TCL_VER=9.0.4
 ARG TCL_MAJOR=9.0
 ARG LLVM=22
 
@@ -56,13 +56,15 @@ set -ex
     ln -s /$SYSROOT/usr/lib/llvm${LLVM}/lib/clang/${LLVM}/lib/$SYSROOT/libclang_rt.builtins-armhf.a libclang_rt.builtins.a
 EOF
 
-ADD "src/tcl${TCL_VER}-src.tar.gz" .
+ADD  --link "src/tcl${TCL_VER}-src.tar.gz" .
+COPY --link "src/thread.patch" .
 
 RUN <<EOF
 set -ex
 cd tcl$TCL_VER
     cd pkgs
-    rm -r itcl* tdbcodbc* tdbcpostgres* tdbcmysql*
+    rm -r itcl* tdbcodbc*
+    patch -d thread* -Np1 -i /src/thread.patch
 
     cd ../unix
     ./configure \
@@ -116,7 +118,7 @@ cd eggdrop
 EOF
 
 ADD --keep-git-dir=true \
-    "https://github.com/bohagan1/TclTLS.git#91d602d995b17da0fa358e4d19f824d938558997" tls
+    "https://github.com/bohagan1/TclTLS.git#6ec6b4987464cb25a948fd28c136e3497c52b6fa" tls
 RUN <<EOF
 set -ex
 cd tls
@@ -146,7 +148,7 @@ cd tdom
 EOF
 
 
-FROM arm32v7/alpine:$ALPINE_VERSION AS qemu_builder
+FROM alpine:$ALPINE_VERSION AS qemu_builder
 COPY --from=cross_builder /opt /opt
 COPY --from=cross_builder /opt /
 
@@ -185,7 +187,7 @@ cd tcllib
 EOF
 
 
-FROM arm32v7/alpine:$ALPINE_VERSION
+FROM alpine:$ALPINE_VERSION
 COPY --from=cross_builder /eggdrop /eggdrop
 COPY --from=qemu_builder  /opt/usr /usr
 
@@ -197,7 +199,9 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
         ca-certificates \
         coreutils \
         dropbear \
+        libpq \
         lscpu \
+        mariadb-connector-c \
         mimalloc2 \
         nano \
         procps \
@@ -254,16 +258,24 @@ RUN <<EOF
 /eggdrop/eggdrop -v
 
 tclsh <<_versions
-    puts "tcl    [info patchlevel]"
-    puts "thread [package require thread]"
-    puts "critcl [package require critcl]"
-    puts "http   [package require http]"
-    puts "tls    [package require tls]"
-    puts "json   [package require json]"
-    puts "tdom   [package require tdom]"
-    puts "sqlite [package require sqlite3]"
-    puts "tdbc   [package require tdbc]"
-    # puts "tdbc::mysql [package require tdbc::mysql]"
+    puts "tcl       [info patchlevel]"
+    puts "base64    [package require base64]"
+    puts "blowfish  [package require blowfish]"
+    puts "critcl    [package require critcl]"
+    puts "htmlparse [package require htmlparse]"
+    puts "http      [package require http]"
+    puts "json      [package require json]"
+    puts "msgcat    [package require msgcat]"
+    puts "sha1      [package require sha1]"
+    puts "sqlite    [package require sqlite3]"
+    puts "tdom      [package require tdom]"
+    puts "textutil  [package require textutil]"
+    puts "thread    [package require thread]"
+    puts "tls       [package require tls]"
+    puts "websocket [package require websocket]"
+    puts "tdbc::mysql    [package require tdbc::mysql]"
+    puts "tdbc::postgres [package require tdbc::postgres]"
+    puts "tdbc::sqlite3  [package require tdbc::sqlite3]"
 _versions
 
     chmod 700 ~/.ssh

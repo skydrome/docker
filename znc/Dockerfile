@@ -7,7 +7,7 @@ ARG ALPINE_VERSION=3.24
 ARG LLVM=22
 
 ARG CCWARN="-Wno-deprecated-non-prototype -Wno-deprecated-declarations"
-ARG CXXFLAGS="-O3 -pipe -fomit-frame-pointer -flto -stdlib=libc++ -DNDEBUG ${CCWARN}"
+ARG CXXFLAGS="-O3 -pipe -march=armv7-a -mtune=cortex-a15 -mfpu=neon-vfpv4 -fomit-frame-pointer -flto -stdlib=libc++ -DNDEBUG ${CCWARN}"
 ARG LDFLAGS="-fuse-ld=mold -rtlib=compiler-rt -unwindlib=libunwind -flto -Wl,-O2,--gc-sections,--strip-all,--as-needed,--sort-common -Wl,-z,relro -Wl,-z,now"
 
 FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx
@@ -68,7 +68,7 @@ cd znc/modules
     ln -s ../../znc-fish/fish.cpp .
 
 cd ..
-    cmake -B build \
+    cmake -B build -Dcxx17check=1 \
         $(xx-clang --print-cmake-defines) \
         -DCMAKE_INSTALL_PREFIX=/usr \
         -DCMAKE_LIBRARY_PATH=/$SYSROOT/usr/lib \
@@ -100,7 +100,7 @@ cd /opt/usr
 EOF
 
 
-FROM arm32v7/alpine:$ALPINE_VERSION
+FROM alpine:$ALPINE_VERSION
 COPY --from=builder /opt/usr /usr
 
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF

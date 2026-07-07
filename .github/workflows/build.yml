@@ -1,0 +1,52 @@
+name: ci
+
+# on:
+#   push:
+#     branches:
+#       - master
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - uses: docker/setup-qemu-action@v4
+
+      - uses: docker/setup-buildx-action@v4
+        with:
+          version: latest
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build containers
+        env:
+          SOURCE_DATE_EPOCH: 0
+        run: |
+          set -e
+
+          for image in "eggdrop" "znc" "tor"; do
+            echo "::group::Validating $image"
+            docker buildx build "$image" --call check
+            echo "::endgroup::"
+          done
+
+          for image in "eggdrop" "znc" "tor"; do
+            echo "::group::Building $image"
+            docker buildx build "$image" \
+              --platform linux/arm/v7 \
+              --load \
+              --tag "skydrome/$image:latest"
+            echo "::endgroup::"
+          done

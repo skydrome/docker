@@ -93,19 +93,24 @@ cd tor
     tree /opt/usr
 EOF
 
-ADD --keep-git-dir=true "https://gitlab.torproject.org/tpo/core/arti.git#arti-v2.4.0" arti
+ADD --keep-git-dir=true "https://gitlab.torproject.org/tpo/core/arti.git#arti-v2.5.0" arti
+ENV CARGO_PROFILE_RELEASE_DEBUG=false
+ENV CARGO_PROFILE_RELEASE_STRIP=symbols
+
 RUN --mount=type=cache,target=/root/.cargo <<EOF
 set -ex
 cd arti
     cargo fetch --target $SYSROOT
-    xx-cargo build --jobs $(nproc) --locked --target $SYSROOT \
-        -p arti --release --features full,accel-openssl
+    xx-cargo build --timings --package arti --release \
+        --jobs $(nproc) --locked --target $SYSROOT \
+        --features default-runtime,onion-service-service,accel-openssl,accel-sha1-asm
     xx-verify target/$SYSROOT/release/arti
     install -Dm755 target/$SYSROOT/release/arti /opt/usr/bin/arti
 EOF
 
-FROM arm32v7/alpine:$ALPINE_VERSION
+FROM alpine:$ALPINE_VERSION
 COPY --from=builder /opt/usr /usr
+# COPY --from=builder /src/arti/target/cargo-timings/cargo-timing.html /
 
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
     apk upgrade --update-cache
