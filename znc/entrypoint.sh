@@ -24,5 +24,5 @@ fi
 echo "==> Starting znc with $(id)"
 znc --version
 
-LD_PRELOAD=/usr/lib/libmimalloc-secure.so.2 \
+exec LD_PRELOAD=/usr/lib/libmimalloc-secure.so.2 \
 znc --foreground --datadir /znc-data

@@ -58,13 +58,19 @@ ADD --keep-git-dir=true --chmod=777 \
     "https://github.com/znc/znc.git" znc
 ADD "https://github.com/Cizzle/znc-autoinvitejoin.git" znc-autoinvitejoin
 ADD "https://github.com/CyberShadow/znc-clientbuffer.git" znc-clientbuffer
-ADD "https://github.com/ZarTek-Creole/mod-znc-fish.git" znc-fish
+ADD "https://github.com/schizoidsaddam/crypt2.git" znc-crypt2
+# ADD "https://github.com/ZarTek-Creole/mod-znc-fish.git" znc-fish
+ADD "https://github.com/fred0r/znc-fish.git" znc-fish
+# COPY --link "src/fish.patch" .
 
 RUN <<EOF
 set -ex
+# patch -d /src/znc-fish -Np1 -i /src/fish.patch
+
 cd znc/modules
     ln -s ../../znc-autoinvitejoin/autoinvitejoin.cpp .
     ln -s ../../znc-clientbuffer/clientbuffer.cpp .
+    ln -s ../../znc-crypt2/crypt2.cpp .
     ln -s ../../znc-fish/fish.cpp .
 
 cd ..
@@ -113,7 +119,6 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
         llvm-libunwind \
         mimalloc2 \
         su-exec \
-        tini \
         zlib
 
     # apk add ncdu libtree
@@ -143,7 +148,7 @@ EOF
 
 USER znc
 VOLUME /znc-data
-ENTRYPOINT ["tini", "--", "/entrypoint.sh"]
+ENTRYPOINT ["/entrypoint.sh"]
 
 LABEL org.opencontainers.image.source="https://github.com/skydrome/docker/tree/master/znc"
 LABEL org.opencontainers.image.description="ZNC arm32v7"

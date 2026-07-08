@@ -123,7 +123,6 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
         netcat-openbsd \
         sqlite-libs \
         su-exec \
-        tini \
         xz-libs \
         zlib \
         zstd-libs
@@ -132,7 +131,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
     apk --purge del apk-tools && rm -rf /lib/apk /etc/apk /usr/share/apk
 EOF
 
-COPY --link entrypoint.sh /
+COPY --link entrypoint.sh healthcheck.sh /
 
 RUN <<EOF
     rm -rf \
@@ -156,7 +155,10 @@ EOF
 
 USER tor
 VOLUME /tor-data
-ENTRYPOINT ["tini", "--", "/entrypoint.sh"]
+ENTRYPOINT ["/entrypoint.sh"]
+STOPSIGNAL SIGINT
+
+HEALTHCHECK --interval=60m CMD /healthcheck.sh
 
 LABEL org.opencontainers.image.source="https://github.com/skydrome/docker/tree/master/tor"
 LABEL org.opencontainers.image.description="Tor/Arti arm32v7"
