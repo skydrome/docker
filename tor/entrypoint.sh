@@ -14,10 +14,10 @@ set -e
 # chown -hRc "$PUID":"$PGID" /tor-data
 
 APP="${APP:-tor}"
-echo "==> Starting $APP with $(id)"
+echo "==> Starting $APP with user: $(id)"
 
 if [ "$APP" = 'arti' ]; then
-    [ -f '/tor-data/etc/arti.toml' ] || {
+    [ ! -f '/tor-data/etc/arti.toml' ] && {
         echo "cant read arti.toml"
         exit 1
     }
@@ -25,7 +25,7 @@ if [ "$APP" = 'arti' ]; then
     arti proxy --config /tor-data/etc/arti.toml
 
 else
-    [ -f '/tor-data/etc/torrc' ] || {
+    [ ! -f '/tor-data/etc/torrc' ] && {
         echo "cant read torrc"
         exit 1
     }

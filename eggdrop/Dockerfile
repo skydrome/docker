@@ -2,7 +2,6 @@
 
 ARG ALPINE_VERSION=3.24
 
-# https://sourceforge.net/projects/tcl/files/Tcl
 ARG TCL_VER=9.0.4
 ARG TCL_MAJOR=9.0
 ARG LLVM=22
@@ -34,7 +33,7 @@ set -ex
     apk upgrade --update-cache
     apk add \
         autoconf autoconf-archive automake clang libtool make patch pkgconf tree \
-        git lld llvm mold
+        fossil git lld llvm mold
 EOF
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
 set -ex
@@ -117,10 +116,11 @@ cd eggdrop
     make install
 EOF
 
-ADD --keep-git-dir=true \
-    "https://github.com/bohagan1/TclTLS.git#6ec6b4987464cb25a948fd28c136e3497c52b6fa" tls
+#ADD --keep-git-dir=true \
+#    "https://github.com/bohagan1/TclTLS.git#6ec6b4987464cb25a948fd28c136e3497c52b6fa" tls
 RUN <<EOF
 set -ex
+fossil get --dest tls https://core.tcl-lang.org/tcltls 1346b54b60c9d10c
 cd tls
     ./configure \
         --host=$SYSROOT --build=$BUILDHOST \
@@ -131,10 +131,11 @@ cd tls
     make install-binaries install-libraries
 EOF
 
-ADD --keep-git-dir=true \
-    "https://github.com/chpock/tdom.git#19d1d7b258588df3257938296f9c59eee561e4fb" tdom
+#ADD --keep-git-dir=true \
+#    "https://github.com/chpock/tdom.git#19d1d7b258588df3257938296f9c59eee561e4fb" tdom
 RUN <<EOF
 set -ex
+fossil get --dest tdom https://core.tcl-lang.org/tdom c6062dff7cc66f71
 cd tdom
     ./configure \
         --host=$SYSROOT --build=$BUILDHOST \
@@ -158,7 +159,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
 set -ex
     apk upgrade --update-cache
     apk add \
-        make clang pkgconf tree lld llvm mold compiler-rt
+        make clang fossil pkgconf tree lld llvm mold compiler-rt
 EOF
 
 ARG CFLAGS LDFLAGS
@@ -176,9 +177,10 @@ cd critcl
         --prefix /usr --dest-dir /opt
 EOF
 
-ADD "https://github.com/tcltk/tcllib.git" tcllib
+#ADD "https://github.com/tcltk/tcllib.git" tcllib
 RUN <<EOF
 set -ex
+fossil get --dest tcllib https://core.tcl-lang.org/tcllib main
 cd tcllib
     tclsh ./installer.tcl \
         -pkgs -pkg-path /opt/usr/lib/tcllib \
@@ -202,12 +204,10 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
         libpq \
         lscpu \
         mariadb-connector-c \
-        mimalloc2 \
         nano \
         procps \
         python3 \
         su-exec \
-        tini \
         util-linux-misc \
         zlib
 
@@ -215,7 +215,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
     apk --purge del apk-tools && rm -rf /lib/apk /etc/apk /usr/share/apk
 EOF
 
-COPY --link entrypoint.sh /
+COPY --link entrypoint.sh healthcheck.sh /
 COPY --link --chmod=600 src/ssh/authorized_keys           /root/.ssh/
 COPY --link --chmod=600 src/ssh/dropbear_ed25519_host_key /etc/dropbear/
 COPY --link --chmod=755 src/gen_ssl_cert.sh               /usr/bin/gen_ssl_cert
@@ -285,7 +285,10 @@ EOF
 # start dropbear as root then drops to eggdrop user
 USER root
 VOLUME /eggdrop-data
-ENTRYPOINT ["tini", "--", "/entrypoint.sh"]
+EXPOSE 22
+ENTRYPOINT ["/entrypoint.sh"]
+HEALTHCHECK --interval=15m CMD /healthcheck.sh
+STOPSIGNAL SIGTERM
 
 LABEL org.opencontainers.image.source="https://github.com/skydrome/docker/tree/master/eggdrop"
 LABEL org.opencontainers.image.description="Eggdrop arm32v7"

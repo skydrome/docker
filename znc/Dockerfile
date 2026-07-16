@@ -1,8 +1,5 @@
 # syntax=docker/dockerfile:1
 
-# TODO
-# https://github.com/microsoft/mimalloc
-
 ARG ALPINE_VERSION=3.24
 ARG LLVM=22
 
@@ -117,7 +114,6 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
         libssl3 \
         libc++ \
         llvm-libunwind \
-        mimalloc2 \
         su-exec \
         zlib
 
@@ -125,7 +121,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
     apk --purge del apk-tools && rm -rf /lib/apk /etc/apk /usr/share/apk
 EOF
 
-COPY --link entrypoint.sh /
+COPY --link entrypoint.sh /healthcheck.sh /
 
 RUN <<EOF
     rm -r \
@@ -149,6 +145,8 @@ EOF
 USER znc
 VOLUME /znc-data
 ENTRYPOINT ["/entrypoint.sh"]
+HEALTHCHECK --interval=15m CMD /healthcheck.sh
+STOPSIGNAL SIGTERM
 
 LABEL org.opencontainers.image.source="https://github.com/skydrome/docker/tree/master/znc"
 LABEL org.opencontainers.image.description="ZNC arm32v7"

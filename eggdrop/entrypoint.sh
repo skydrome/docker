@@ -1,31 +1,34 @@
 #!/bin/sh
-# shellcheck source=/dev/null
 set -e
 
 # allow entering
 [ "$1" = 'sh' ] && exec /bin/bash
 
-# start as root to set permissions, then drop to unprivileged user
-if [ "$(id -u)" = "0" ]; then
-    dropbear -Ems \
-    -r /etc/dropbear/dropbear_ed25519_host_key \
-    -p 0.0.0.0:22 &&
+# start dropbear then drop to unprivileged user
+if [ "$(id -u)" -eq 0 ]; then
+    dropbear -REms \
+        -r /etc/dropbear/dropbear_ed25519_host_key \
+        -p 0.0.0.0:22 &&
     echo "SSH started on port 22" || echo "SSH failed to start"
 
-    mkdir -p /eggdrop-data/scripts
-    chown -R eggdrop /eggdrop-data
-    su-exec eggdrop "$0" "$@"
-    exit 0
+    exec su-exec eggdrop "$0" "$@"
 fi
 
-cd /eggdrop
+echo "==> Starting eggdrop with user: $(id)"
 
-ln -sf /eggdrop-data/scripts ./scripts
-
-[ -f '/eggdrop-data/eggdrop.conf' ] || {
+[ ! -w '/eggdrop-data' ] && {
+    echo "cant read/write to volume"
+    echo "change owner to uid $(id -u)"
+    exit 1
+}
+[ ! -f '/eggdrop-data/eggdrop.conf' ] && {
     echo "cant read eggdrop.conf"
     exit 1
 }
+
+cd /eggdrop
+mkdir -p /eggdrop-data/scripts
+ln -snf  /eggdrop-data/scripts ./scripts
 
 # if [ -f '/eggdrop-data/.venv/bin/activate' ]; then
 #     echo "==> Activating python venv"
@@ -35,6 +38,4 @@ ln -sf /eggdrop-data/scripts ./scripts
 #     uv venv /eggdrop-data/.venv
 # fi
 
-echo "==> Starting eggdrop with uid: $(id eggdrop)"
-LD_PRELOAD=/usr/lib/libmimalloc-secure.so.2 \
-./eggdrop -t /eggdrop-data/eggdrop.conf  #&& tail -qF /tmp/console.log
+exec ./eggdrop -t /eggdrop-data/eggdrop.conf  #&& tail -qF /tmp/console.log

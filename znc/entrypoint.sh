@@ -1,16 +1,17 @@
 #!/bin/sh
 set -e
 
-#if [ "$(id -u)" = '0' ]; then
-#    chown -R znc:znc "$DATADIR" || exit 1
-#    chmod 700 "$DATADIR" || exit 2
-#    exec su-exec znc:znc /entrypoint.sh "$@"
-#fi
-
 # allow entering
 [ "$1" = 'sh' ] && exec /bin/ash
 
-[ -f '/znc-data/configs/znc.conf' ] || {
+echo "==> Starting znc with user: $(id)"
+
+[ ! -w '/znc-data' ] && {
+    echo "cant read/write to volume"
+    echo "change owner to uid $(id -u)"
+    exit 1
+}
+[ ! -f '/znc-data/configs/znc.conf' ] && {
     echo "cant read configs/znc.conf"
     exit 1
 }
@@ -21,8 +22,5 @@ if [ ! -f '/znc-data/znc.pem' ]; then
     sleep 5
 fi
 
-echo "==> Starting znc with $(id)"
 znc --version
-
-exec LD_PRELOAD=/usr/lib/libmimalloc-secure.so.2 \
-znc --foreground --datadir /znc-data
+exec znc --foreground --datadir /znc-data

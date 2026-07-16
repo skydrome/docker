@@ -103,7 +103,7 @@ cd arti
     cargo fetch --target $SYSROOT
     xx-cargo build --timings --package arti --release \
         --jobs $(nproc) --locked --target $SYSROOT \
-        --features default-runtime,onion-service-service,accel-openssl,accel-sha1-asm
+        --features default-runtime,onion-service-service,counter-galois-onion,accel-openssl,accel-sha1-asm
     xx-verify target/$SYSROOT/release/arti
     install -Dm755 target/$SYSROOT/release/arti /opt/usr/bin/arti
 EOF
@@ -156,9 +156,8 @@ EOF
 USER tor
 VOLUME /tor-data
 ENTRYPOINT ["/entrypoint.sh"]
-STOPSIGNAL SIGINT
-
 HEALTHCHECK --interval=60m CMD /healthcheck.sh
+STOPSIGNAL SIGINT
 
 LABEL org.opencontainers.image.source="https://github.com/skydrome/docker/tree/master/tor"
 LABEL org.opencontainers.image.description="Tor/Arti arm32v7"
