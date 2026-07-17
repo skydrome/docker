@@ -1,0 +1,50 @@
+proc alias {args} {
+    switch -- [llength $args] {
+        0 {
+            foreach alias [lsort [interp aliases]] {
+                puts [format "%-12s ->  %s" $alias [interp alias {} $alias]]
+            }
+        }
+        1 {
+            set alias [lindex $args 0]
+            puts [format "%-12s ->  %s" $alias [interp alias {} $alias]]
+        }
+        default {
+            set alias [lindex $args 0]
+            set cmd   [lrange $args 1 end]
+            eval [linsert $cmd 0 interp alias {} $alias {}]
+        }
+    }
+}
+
+alias quit exit
+alias q    exit
+
+alias pf package forget
+alias pr package require
+
+alias putlog   puts
+alias putquick puts
+alias putserv  puts
+alias puthelp  puts
+
+set nick     "BotNick"
+set botnick   $nick
+set botnet-nick $nick
+set realname  "BotName"
+set admin     "Admin"
+set owner     $admin
+set network   "NetworkName"
+set username  $realname
+set server    "irc.example.com:+6697"
+
+if {$tcl_interactive} {
+    package require tclreadline
+
+    namespace import tclreadline::ls
+
+    set tclreadline::historyLength 1000
+    set tclreadline::autosave 1
+
+    tclreadline::Loop
+}

@@ -7,7 +7,7 @@ ARG TCL_MAJOR=9.0
 ARG LLVM=22
 
 ARG CC=clang
-ARG CCWARN="-Wno-deprecated-non-prototype"
+ARG CCWARN="-Wno-deprecated-non-prototype -Wno-incompatible-library-redeclaration"
 ARG CFLAGS="-O3 -pipe -march=armv7-a -mtune=cortex-a15 -mfpu=neon-vfpv4 -mfloat-abi=hard -fomit-frame-pointer -flto ${CCWARN}"
 ARG LDFLAGS="-fuse-ld=mold -flto -rtlib=compiler-rt -Wl,-O2,--gc-sections,--strip-all,--as-needed,--sort-common -Wl,-z,relro -Wl,-z,now"
 
@@ -39,7 +39,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
 set -ex
     xx-apk add --no-scripts \
         gcc musl-dev zlib-dev compiler-rt \
-        openssl-dev bsd-compat-headers python3-dev
+        openssl-dev bsd-compat-headers python3-dev readline-dev
 EOF
 
 ARG CFLAGS LDFLAGS
@@ -116,8 +116,7 @@ cd eggdrop
     make install
 EOF
 
-#ADD --keep-git-dir=true \
-#    "https://github.com/bohagan1/TclTLS.git#6ec6b4987464cb25a948fd28c136e3497c52b6fa" tls
+#ADD "https://github.com/bohagan1/TclTLS.git#6ec6b4987464cb25a948fd28c136e3497c52b6fa" tls
 RUN <<EOF
 set -ex
 fossil get --dest tls https://core.tcl-lang.org/tcltls 1346b54b60c9d10c
@@ -131,8 +130,7 @@ cd tls
     make install-binaries install-libraries
 EOF
 
-#ADD --keep-git-dir=true \
-#    "https://github.com/chpock/tdom.git#19d1d7b258588df3257938296f9c59eee561e4fb" tdom
+#ADD "https://github.com/chpock/tdom.git#19d1d7b258588df3257938296f9c59eee561e4fb" tdom
 RUN <<EOF
 set -ex
 fossil get --dest tdom https://core.tcl-lang.org/tdom c6062dff7cc66f71
@@ -146,6 +144,24 @@ cd tdom
 
 # cd extensions/tdomhtml
 #    ./configure
+EOF
+
+ADD "https://github.com/flightaware/tclreadline.git" tclreadline
+RUN <<EOF
+set -ex
+cd tclreadline
+    autoreconf -ivf
+    ./configure \
+        --host=$SYSROOT --build=$BUILDHOST \
+        --prefix=/usr --without-tk \
+        --with-tcl=/opt/usr/lib --with-readline-includes=/armv7-alpine-linux-musleabihf/usr/include
+
+    make
+    xx-clang -shared -fPIC -o .libs/libtclreadline-2.4.1.so .libs/libtclreadline_la-tclreadline.o -L/opt/usr/lib/libtcl${TCL_MAJOR}.so -lreadline
+
+    make DESTDIR=/opt install
+    cd /opt/usr/lib/tclreadline2.4.1
+    ln -s ../libtclreadline-2.4.1.so libtclreadline.so
 EOF
 
 
@@ -197,6 +213,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
     apk upgrade --update-cache
     apk add \
         bash \
+        bash-completion \
         busybox-extras \
         ca-certificates \
         coreutils \
@@ -216,9 +233,11 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
 EOF
 
 COPY --link entrypoint.sh healthcheck.sh /
-COPY --link --chmod=600 src/ssh/authorized_keys           /root/.ssh/
+COPY --link --chmod=644 src/tclshrc                       /etc/
+COPY --link --chmod=644 src/bash.profile                  /etc/bash/custom.sh
 COPY --link --chmod=600 src/ssh/dropbear_ed25519_host_key /etc/dropbear/
-COPY --link --chmod=755 src/gen_ssl_cert.sh               /usr/bin/gen_ssl_cert
+COPY --link --chmod=600 src/ssh/authorized_keys           /root/.ssh/
+COPY --link --chmod=755 src/gen_ssl_cert.sh               /usr/bin/gen_ssl_cert_cert
 
 ENV PS1="\[\e[0;32m\]\u\[\e[0m\]:\[\e[0;34m\]\w\[\e[0m\]\$ "
 SHELL ["/bin/bash", "-c"]
@@ -236,6 +255,7 @@ RUN <<EOF
         /eggdrop/modules-*/{filesys,share,notes,seen,assoc,uptime,ident,compress}.so \
         /eggdrop/{doc,scripts,language/*{dan,fin,fre,ger,ita,por}*} \
         /sbin/{hwclock,zramctl,*swap*,fsck*,mkfs*,blk*} \
+        /usr/local \
         /usr/include \
         /usr/lib/*.a \
         /usr/lib/python$PYTHON_VER/{pydoc_data,ensurepip/_bundled,lib2to3} \
@@ -244,12 +264,15 @@ RUN <<EOF
         /usr/lib/critcl-*/critcl_c/tcl8.{6,7} \
         /usr/sbin/{update-ca-*,rtcwake,rfkill} \
         /usr/share/{man,udhcpc} \
-        /var/{lib,tmp,opt,mail,local} \
+        /var/{lib,tmp,opt,mail,local,cache/*,log/apk*} \
         /var/spool
 
     ln -sf /dev/null /var/log/wtmp
+    ln -sf /etc/bash/custom.sh /etc/profile.d/
+
     find /usr/lib/python$PYTHON_VER -iname "*opt-1.pyc" -type f -delete
 
+    sed -i 's|/bin/sh|/bin/bash|' /etc/passwd
     adduser -D -s /bin/bash -H -h /eggdrop-data eggdrop
     chown -R eggdrop:eggdrop /eggdrop
 EOF
@@ -273,6 +296,7 @@ tclsh <<_versions
     puts "thread    [package require thread]"
     puts "tls       [package require tls]"
     puts "websocket [package require websocket]"
+    puts "readline  [package require tclreadline]"
     puts "tdbc::mysql    [package require tdbc::mysql]"
     puts "tdbc::postgres [package require tdbc::postgres]"
     puts "tdbc::sqlite3  [package require tdbc::sqlite3]"
