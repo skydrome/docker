@@ -1,18 +1,23 @@
 #!/bin/sh
+# shellcheck disable=SC1091
 set -e
 
 # allow entering
 [ "$1" = 'sh' ] && exec /bin/bash
 
 # start dropbear then drop to unprivileged user
+SSH_PORT=22
 if [ "$(id -u)" -eq 0 ]; then
     dropbear -REms \
         -r /etc/dropbear/dropbear_ed25519_host_key \
-        -p 0.0.0.0:22 &&
-    echo "SSH started on port 22" || echo "SSH failed to start"
+        -p 0.0.0.0:$SSH_PORT &&
+    echo "SSH started on port $SSH_PORT" || echo "SSH failed to start"
 
     exec su-exec eggdrop "$0" "$@"
 fi
+
+cd /eggdrop
+ln -sf /eggdrop-data/scripts .
 
 echo "==> Starting eggdrop with user: $(id)"
 
@@ -21,21 +26,18 @@ echo "==> Starting eggdrop with user: $(id)"
     echo "change owner to uid $(id -u)"
     exit 1
 }
-[ ! -f '/eggdrop-data/eggdrop.conf' ] && {
+[ ! -r '/eggdrop-data/eggdrop.conf' ] && {
     echo "cant read eggdrop.conf"
     exit 1
 }
+[ ! -e scripts ] && {
+    echo "scripts directory is missing"
+    exit 1
+}
 
-cd /eggdrop
-mkdir -p /eggdrop-data/scripts
-ln -snf  /eggdrop-data/scripts ./scripts
+[ -r '/eggdrop-data/.venv/bin/activate' ] && {
+    echo "==> Activating python venv"
+    . /eggdrop-data/.venv/bin/activate
+}
 
-# if [ -f '/eggdrop-data/.venv/bin/activate' ]; then
-#     echo "==> Activating python venv"
-#     . .venv/bin/activate
-# else
-#     echo "==> Creating python venv"
-#     uv venv /eggdrop-data/.venv
-# fi
-
-exec ./eggdrop -t /eggdrop-data/eggdrop.conf  #&& tail -qF /tmp/console.log
+exec ./eggdrop -t /eggdrop-data/eggdrop.conf

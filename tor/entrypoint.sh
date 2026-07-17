@@ -7,17 +7,11 @@ set -e
 # [ -f /tor-data/pinger.conf ] &&
 #     /pinger.sh & || echo "cant read pinger.conf"
 
-# PUID=${PUID=0}
-# PGID=${PGID=0}
-
-# echo "==> Performing startup jobs and maintenance tasks"
-# chown -hRc "$PUID":"$PGID" /tor-data
-
 APP="${APP:-tor}"
 echo "==> Starting $APP with user: $(id)"
 
 if [ "$APP" = 'arti' ]; then
-    [ ! -f '/tor-data/etc/arti.toml' ] && {
+    [ ! -r '/tor-data/etc/arti.toml' ] && {
         echo "cant read arti.toml"
         exit 1
     }
@@ -25,7 +19,7 @@ if [ "$APP" = 'arti' ]; then
     arti proxy --config /tor-data/etc/arti.toml
 
 else
-    [ ! -f '/tor-data/etc/torrc' ] && {
+    [ ! -r '/tor-data/etc/torrc' ] && {
         echo "cant read torrc"
         exit 1
     }

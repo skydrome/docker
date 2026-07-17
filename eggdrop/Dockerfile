@@ -116,7 +116,6 @@ cd eggdrop
     make install
 EOF
 
-#ADD "https://github.com/bohagan1/TclTLS.git#6ec6b4987464cb25a948fd28c136e3497c52b6fa" tls
 RUN <<EOF
 set -ex
 fossil get --dest tls https://core.tcl-lang.org/tcltls 1346b54b60c9d10c
@@ -130,7 +129,6 @@ cd tls
     make install-binaries install-libraries
 EOF
 
-#ADD "https://github.com/chpock/tdom.git#19d1d7b258588df3257938296f9c59eee561e4fb" tdom
 RUN <<EOF
 set -ex
 fossil get --dest tdom https://core.tcl-lang.org/tdom c6062dff7cc66f71
@@ -141,9 +139,6 @@ cd tdom
 
     make binaries libraries
     make install-binaries install-libraries
-
-# cd extensions/tdomhtml
-#    ./configure
 EOF
 
 ADD "https://github.com/flightaware/tclreadline.git" tclreadline
@@ -153,15 +148,16 @@ cd tclreadline
     autoreconf -ivf
     ./configure \
         --host=$SYSROOT --build=$BUILDHOST \
-        --prefix=/usr --without-tk \
-        --with-tcl=/opt/usr/lib --with-readline-includes=/armv7-alpine-linux-musleabihf/usr/include
+        --prefix=/usr \
+        --with-tcl=/opt/usr/lib --with-readline-includes=/armv7-alpine-linux-musleabihf/usr/include \
+        --without-tk
 
     make
-    xx-clang -shared -fPIC -o .libs/libtclreadline-2.4.1.so .libs/libtclreadline_la-tclreadline.o -L/opt/usr/lib/libtcl${TCL_MAJOR}.so -lreadline
+    xx-clang $LDFLAGS -shared -fPIC -L/opt/usr/lib -ltcl9.0 -lreadline \
+        -o .libs/libtclreadline-2.4.1.so .libs/libtclreadline_la-tclreadline.o \
 
     make DESTDIR=/opt install
-    cd /opt/usr/lib/tclreadline2.4.1
-    ln -s ../libtclreadline-2.4.1.so libtclreadline.so
+    mv /opt/usr/lib/libtclreadline* /opt/usr/lib/tclreadline2.4.1
 EOF
 
 
@@ -193,7 +189,6 @@ cd critcl
         --prefix /usr --dest-dir /opt
 EOF
 
-#ADD "https://github.com/tcltk/tcllib.git" tcllib
 RUN <<EOF
 set -ex
 fossil get --dest tcllib https://core.tcl-lang.org/tcllib main
