@@ -3,7 +3,8 @@ name: ci
 on:
   push:
     branches:
-      - master
+      - test
+  workflow_dispatch:
 
 jobs:
   docker:
@@ -19,34 +20,66 @@ jobs:
           lfs: true
 
       - uses: docker/setup-qemu-action@v4
-
       - uses: docker/setup-buildx-action@v4
         with:
           version: latest
 
-      - uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build containers
-        env:
-          SOURCE_DATE_EPOCH: 0
+      - name: Determine images to build
+        id: changes
         run: |
-          set -e
+          set -euo pipefail
 
-          for image in "eggdrop" "znc" "tor"; do
-            echo "::group::Validating $image"
-            docker buildx build "$image" --call check
+          images=(eggdrop znc tor)
+          dockerfiles=("${images[@]/%//Dockerfile}")
+          before="${{ github.event.before }}"
+
+          if [[ "$before" == "0000000000000000000000000000000000000000" ]] || \
+             ! git cat-file -e "$before" 2>/dev/null; then
+            files=$(git ls-files -- "${dockerfiles[@]}")
+          else
+            files=$(git diff --name-only "$before" "${{ github.sha }}" -- "${dockerfiles[@]}")
+          fi
+
+          mapfile -t changed < <(printf '%s\n' "$files" |cut -d/ -f1)
+          echo "images=${changed[*]}" >>"$GITHUB_OUTPUT"
+          echo "Building images -> ${changed[*]}"
+
+      - name: Build images
+        if: steps.changes.outputs.images
+        run: |
+          set -euo pipefail
+
+          for image in ${{ steps.changes.outputs.images }}; do
+            echo "::group::Checking $image"
+            docker buildx build --check=true "$image"
             echo "::endgroup::"
-          done
 
-          for image in "eggdrop" "znc" "tor"; do
             echo "::group::Building $image"
-            docker buildx build "$image" \
+            docker buildx build \
               --platform linux/arm/v7 \
+              --tag "$image:latest" \
               --load \
-              --tag "skydrome/$image:latest"
+              "$image"
             echo "::endgroup::"
           done
+
+      - uses: anchore/scan-action/download-grype@main
+        id: grype
+        with:
+          grype-version: v0.116.0
+      - name: Run Grype vulnerability scanner
+        if: steps.changes.outputs.images
+        shell: bash
+        run: |
+          for image in ${{ steps.changes.outputs.images }}; do
+            echo "::group::Scanning $image"
+            ${{ steps.grype.outputs.cmd }} --ignore-states wont-fix --fail-on critical \
+              docker:$image:latest
+            echo "::endgroup::"
+          done
+
+      # - uses: docker/login-action@v4
+      #   with:
+      #     registry: ghcr.io
+      #     username: ${{ github.actor }}
+      #     password: ${{ secrets.GITHUB_TOKEN }}

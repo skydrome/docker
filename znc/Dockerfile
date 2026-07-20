@@ -58,11 +58,9 @@ ADD "https://github.com/CyberShadow/znc-clientbuffer.git" znc-clientbuffer
 ADD "https://github.com/schizoidsaddam/crypt2.git" znc-crypt2
 # ADD "https://github.com/ZarTek-Creole/mod-znc-fish.git" znc-fish
 ADD "https://github.com/fred0r/znc-fish.git" znc-fish
-# COPY --link "src/fish.patch" .
 
 RUN <<EOF
 set -ex
-# patch -d /src/znc-fish -Np1 -i /src/fish.patch
 
 cd znc/modules
     ln -s ../../znc-autoinvitejoin/autoinvitejoin.cpp .
@@ -87,6 +85,7 @@ cd ..
     cmake --build build --parallel $(nproc)
     DESTDIR=/opt cmake --install build
 EOF
+
 RUN <<EOF
 set -e
 cd /opt/usr
@@ -99,7 +98,6 @@ cd /opt/usr
         share/znc/webskins/ice
 
     xx-verify bin/znc
-    tree .
 EOF
 
 
@@ -118,7 +116,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
         zlib
 
     # apk add ncdu libtree
-    apk --purge del apk-tools && rm -rf /lib/apk /etc/apk /usr/share/apk
+    apk --purge del apk-tools && rm -rf /etc/apk /usr/share/apk
 EOF
 
 COPY --link entrypoint.sh /healthcheck.sh /

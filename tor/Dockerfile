@@ -128,7 +128,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
         zstd-libs
 
     # apk add ncdu libtree
-    apk --purge del apk-tools && rm -rf /lib/apk /etc/apk /usr/share/apk
+    apk --purge del apk-tools && rm -rf /etc/apk /usr/share/apk
 EOF
 
 COPY --link entrypoint.sh healthcheck.sh /
