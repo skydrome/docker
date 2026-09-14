@@ -2,6 +2,8 @@
 # shellcheck disable=SC3001
 set -eu
 
+CONF=/znc-data/configs/znc.conf
+
 pgrep -x znc || { echo "znc process not found"; exit 1; }
 
 while read -r port; do
@@ -9,6 +11,6 @@ while read -r port; do
         echo "PORT: $port is down"
         _status=1
     }
-done < <(awk '/^[[:space:]]*Port[[:space:]]*=/{print $3}' /znc-data/configs/znc.conf)
+done < <(awk '/^[[:space:]]*Port[[:space:]]*=/{print $3}' "$CONF")
 
 exit "${_status:-0}"

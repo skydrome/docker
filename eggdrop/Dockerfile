@@ -8,8 +8,8 @@ ARG LLVM=22
 
 ARG CC=clang
 ARG CCWARN="-Wno-deprecated-non-prototype -Wno-incompatible-library-redeclaration"
-ARG CFLAGS="-O3 -pipe -march=armv7-a -mtune=cortex-a15 -mfpu=neon-vfpv4 -mfloat-abi=hard -fomit-frame-pointer -flto ${CCWARN}"
-ARG LDFLAGS="-fuse-ld=mold -flto -rtlib=compiler-rt -Wl,-O2,--gc-sections,--strip-all,--as-needed,--sort-common -Wl,-z,relro -Wl,-z,now"
+ARG CFLAGS="-O3 -pipe -march=armv7-a -mtune=cortex-a15 -mthumb -mfpu=neon-vfpv4 -mfloat-abi=hard -fomit-frame-pointer -flto -ffunction-sections -fdata-sections ${CCWARN}"
+ARG LDFLAGS="-fuse-ld=lld -flto -rtlib=compiler-rt -unwindlib=libunwind -Wl,--lto-O3,-O2,--gc-sections,--icf=all,--strip-all,--as-needed,--sort-common -Wl,-z,relro -Wl,-z,now"
 
 FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx
 FROM --platform=$BUILDPLATFORM alpine:$ALPINE_VERSION AS cross_builder
@@ -33,18 +33,19 @@ set -ex
     apk upgrade --update-cache
     apk add \
         autoconf autoconf-archive automake clang libtool make patch pkgconf tree \
-        fossil git lld llvm mold
+        fossil git lld llvm
 EOF
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
 set -ex
     xx-apk add --no-scripts \
-        gcc musl-dev zlib-dev compiler-rt \
+        musl-dev zlib-dev compiler-rt llvm-libunwind-dev \
         openssl-dev bsd-compat-headers python3-dev readline-dev
 EOF
 
 ARG CFLAGS LDFLAGS
 ENV CFLAGS=$CFLAGS LDFLAGS=$LDFLAGS
 ENV CC=xx-clang
+ENV LD=ld.lld
 
 RUN <<EOF
 set -ex
@@ -53,6 +54,10 @@ set -ex
 
     cd /usr/lib/llvm${LLVM}/lib/clang/${LLVM}/lib/$SYSROOT
     ln -s /$SYSROOT/usr/lib/llvm${LLVM}/lib/clang/${LLVM}/lib/$SYSROOT/libclang_rt.builtins-armhf.a libclang_rt.builtins.a
+    for f in crtbegin crtend; do
+        ln -sf clang_rt.${f}-armhf.o ${f}.o
+        ln -sf clang_rt.${f}-armhf.o ${f}S.o
+    done
 EOF
 
 ADD  --link "src/tcl${TCL_VER}-src.tar.gz" .
@@ -72,7 +77,7 @@ cd tcl$TCL_VER
         --disable-64bit \
         --disable-symbols \
         --disable-rpath \
-        --disable-zipfs
+        --disable-zipfs ||cat config.log
 
     make -j$(nproc)
     xx-verify tclsh
@@ -98,6 +103,7 @@ COPY --link src/egg-force-cross.patch .
 RUN <<EOF
 set -ex
 cd eggdrop
+git rev-parse HEAD
     [[ ! -f configure ]] && ./autogen.sh
     patch -Np1 -i ../egg-force-cross.patch
 
@@ -150,7 +156,7 @@ cd tclreadline
         --host=$SYSROOT --build=$BUILDHOST \
         --prefix=/usr \
         --with-tcl=/opt/usr/lib --with-readline-includes=/armv7-alpine-linux-musleabihf/usr/include \
-        --without-tk
+        --without-tk ||cat config.log
 
     make
     xx-clang $LDFLAGS -shared -fPIC -L/opt/usr/lib -ltcl9.0 -lreadline \
@@ -214,6 +220,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
         coreutils \
         dropbear \
         libpq \
+        llvm-libunwind \
         lscpu \
         mariadb-connector-c \
         nano \
@@ -223,7 +230,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
         util-linux-misc \
         zlib
 
-    # apk add ncdu libtree
+    # apk add ncdu libtree binutils
     apk --purge del apk-tools && rm -rf /etc/apk /usr/share/apk
 EOF
 

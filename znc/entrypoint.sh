@@ -21,5 +21,4 @@ echo "==> Starting znc with user: $(id)"
     sleep 5
 }
 
-znc --version
 exec znc --foreground --datadir /znc-data

@@ -5,9 +5,13 @@ ARG LLVM=22
 
 ARG CC=xx-clang
 ARG CCWARN="-Wno-deprecated-non-prototype -Wno-shorten-64-to-32 -Wno-format"
-ARG CFLAGS="-O3 -pipe -march=armv7-a -mtune=cortex-a15 -mfpu=neon-vfpv4 -mfloat-abi=hard -fomit-frame-pointer -flto ${CCWARN}"
-ARG LDFLAGS="-fuse-ld=mold -flto -rtlib=compiler-rt -Wl,-O2,--gc-sections,--strip-all,--as-needed,--sort-common -Wl,-z,relro -Wl,-z,now"
-ARG RUSTFLAGS="-C target-cpu=cortex-a15 -C linker-plugin-lto -C link-arg=-fuse-ld=lld"
+ARG CFLAGS="-O3 -pipe -march=armv7-a -mtune=cortex-a15 -mfpu=neon-vfpv4 -mfloat-abi=hard -mthumb -fomit-frame-pointer -flto -ffunction-sections -fdata-sections ${CCWARN}"
+ARG LDFLAGS="-fuse-ld=lld -flto -rtlib=compiler-rt -unwindlib=libunwind -Wl,--lto-O3,-O2,--gc-sections,--icf=safe,--strip-all,--as-needed,--sort-common -Wl,-z,relro -Wl,-z,now"
+ARG RUSTFLAGS="-C target-cpu=cortex-a15 \
+    -C linker=clang -C linker-plugin-lto -C link-arg=-fuse-ld=lld \
+    -C link-arg=--target=armv7-alpine-linux-musleabihf \
+    -C link-arg=-rtlib=compiler-rt -C link-arg=-unwindlib=libunwind \
+    -C link-arg=-Wl,--gc-sections,--icf=safe,--strip-all,--as-needed"
 
 FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx
 FROM --platform=$BUILDPLATFORM alpine:$ALPINE_VERSION AS builder
@@ -31,12 +35,12 @@ set -ex
     apk upgrade --update-cache
     apk add \
         autoconf autoconf-archive automake clang libtool make patch pkgconf tree \
-        git lld llvm mold rust cargo
+        git lld llvm llvm-libunwind-dev rust cargo
 EOF
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
 set -ex
     xx-apk add --no-scripts \
-        gcc musl-dev zlib-dev compiler-rt \
+        musl-dev zlib-dev compiler-rt llvm-libunwind-dev \
         jemalloc-dev libcap-dev libevent-dev libgcrypt-dev libseccomp-dev openssl-dev xz-dev zstd-dev sqlite-dev
 EOF
 
@@ -93,7 +97,7 @@ cd tor
     tree /opt/usr
 EOF
 
-ADD --keep-git-dir=true "https://gitlab.torproject.org/tpo/core/arti.git#arti-v2.5.0" arti
+ADD --keep-git-dir=true "https://gitlab.torproject.org/tpo/core/arti.git#arti-v2.6.0" arti
 ENV CARGO_PROFILE_RELEASE_DEBUG=false
 ENV CARGO_PROFILE_RELEASE_STRIP=symbols
 
@@ -120,6 +124,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
         libevent \
         libseccomp \
         libssl3 \
+        llvm-libunwind \
         netcat-openbsd \
         sqlite-libs \
         su-exec \

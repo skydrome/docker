@@ -4,8 +4,8 @@ ARG ALPINE_VERSION=3.24
 ARG LLVM=22
 
 ARG CCWARN="-Wno-deprecated-non-prototype -Wno-deprecated-declarations"
-ARG CXXFLAGS="-O3 -pipe -march=armv7-a -mtune=cortex-a15 -mfpu=neon-vfpv4 -fomit-frame-pointer -flto -stdlib=libc++ -DNDEBUG ${CCWARN}"
-ARG LDFLAGS="-fuse-ld=mold -rtlib=compiler-rt -unwindlib=libunwind -flto -Wl,-O2,--gc-sections,--strip-all,--as-needed,--sort-common -Wl,-z,relro -Wl,-z,now"
+ARG CXXFLAGS="-O3 -pipe -march=armv7-a -mtune=cortex-a15 -mfloat-abi=hard -mfpu=neon-vfpv4 -mthumb -fomit-frame-pointer -flto -ffunction-sections -fdata-sections -stdlib=libc++ -DNDEBUG ${CCWARN}"
+ARG LDFLAGS="-fuse-ld=lld -rtlib=compiler-rt -unwindlib=libunwind -flto -Wl,--lto-O3,-O2,--gc-sections,--icf=all,--strip-all,--as-needed,--sort-common -Wl,-z,relro -Wl,-z,now"
 
 FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx
 FROM --platform=$BUILDPLATFORM alpine:$ALPINE_VERSION AS builder
@@ -28,13 +28,12 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
 set -ex
     apk upgrade --update-cache
     apk add \
-       libc++-dev compiler-rt clang cmake git lld llvm llvm-libunwind-dev \
-       make mold patch pkgconf tree
+       clang cmake git lld llvm make patch pkgconf tree
 EOF
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
 set -ex
     xx-apk add \
-        g++ libc++-dev musl-dev compiler-rt llvm-libunwind-dev \
+        libc++-dev musl-dev compiler-rt llvm-libunwind-dev \
         argon2-dev cyrus-sasl-dev openssl-dev zlib-dev
 EOF
 
@@ -49,6 +48,10 @@ set -ex
 
     cd /usr/lib/llvm${LLVM}/lib/clang/${LLVM}/lib/$SYSROOT
     ln -s /$SYSROOT/usr/lib/llvm${LLVM}/lib/clang/${LLVM}/lib/$SYSROOT/libclang_rt.builtins-armhf.a libclang_rt.builtins.a
+    for f in crtbegin crtend; do
+        ln -sf clang_rt.${f}-armhf.o ${f}.o
+        ln -sf clang_rt.${f}-armhf.o ${f}S.o
+    done
 EOF
 
 ADD --keep-git-dir=true --chmod=777 \
@@ -69,6 +72,7 @@ cd znc/modules
     ln -s ../../znc-fish/fish.cpp .
 
 cd ..
+git rev-parse HEAD
     cmake -B build -Dcxx17check=1 \
         $(xx-clang --print-cmake-defines) \
         -DCMAKE_INSTALL_PREFIX=/usr \
@@ -115,7 +119,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
         su-exec \
         zlib
 
-    # apk add ncdu libtree
+    # apk add ncdu libtree binutils
     apk --purge del apk-tools && rm -rf /etc/apk /usr/share/apk
 EOF
 
