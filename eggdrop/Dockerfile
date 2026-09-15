@@ -39,7 +39,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
 set -ex
     xx-apk add --no-scripts \
         musl-dev zlib-dev compiler-rt llvm-libunwind-dev \
-        openssl-dev bsd-compat-headers python3-dev readline-dev
+        openssl-dev bsd-compat-headers python3-dev readline-dev mbedtls3-dev
 EOF
 
 ARG CFLAGS LDFLAGS
@@ -166,6 +166,20 @@ cd tclreadline
     mv /opt/usr/lib/libtclreadline* /opt/usr/lib/tclreadline2.4.1
 EOF
 
+ADD "https://github.com/chpock/tclmtls.git" mtls
+RUN <<EOF
+set -ex
+cd mtls
+    ./configure \
+        --host=$SYSROOT --build=$BUILDHOST \
+        --prefix=/opt/usr \
+        --with-tcl=/opt/usr/lib \
+        --with-mbedtls=/$SYSROOT/usr ||cat config.log
+
+    make
+    make install
+EOF
+
 
 FROM alpine:$ALPINE_VERSION AS qemu_builder
 COPY --from=cross_builder /opt /opt
@@ -177,7 +191,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
 set -ex
     apk upgrade --update-cache
     apk add \
-        make clang fossil pkgconf tree lld llvm mold compiler-rt
+        make clang fossil pkgconf tree lld llvm mold compiler-rt llvm-libunwind-dev
 EOF
 
 ARG CFLAGS LDFLAGS
@@ -223,6 +237,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked <<EOF
         llvm-libunwind \
         lscpu \
         mariadb-connector-c \
+        mbedtls3 \
         nano \
         procps \
         python3 \
@@ -297,6 +312,7 @@ tclsh <<_versions
     puts "textutil  [package require textutil]"
     puts "thread    [package require thread]"
     puts "tls       [package require tls]"
+    puts "mtls      [package require mtls]"
     puts "websocket [package require websocket]"
     puts "readline  [package require tclreadline]"
     puts "tdbc::mysql    [package require tdbc::mysql]"
