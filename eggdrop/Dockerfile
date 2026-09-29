@@ -2,8 +2,7 @@
 
 ARG ALPINE_VERSION=3.24
 
-ARG TCL_VER=9.0.4
-ARG TCL_MAJOR=9.0
+ARG TCL_VER=9.1.0
 ARG LLVM=22
 
 ARG CC=clang
@@ -15,7 +14,7 @@ FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx
 FROM --platform=$BUILDPLATFORM alpine:$ALPINE_VERSION AS cross_builder
 COPY --link --from=xx / /
 
-ARG BUILDPLATFORM TARGETPLATFORM TARGETOS TARGETARCH TARGETVARIANT TCL_VER TCL_MAJOR LLVM
+ARG BUILDPLATFORM TARGETPLATFORM TARGETOS TARGETARCH TARGETVARIANT TCL_VER LLVM
 #    linux/amd64   linux/arm/v7   linux      arm         v7
 ENV BUILDPLATFORM=$BUILDPLATFORM
 ENV TARGETPLATFORM=$TARGETPLATFORM
@@ -61,14 +60,12 @@ set -ex
 EOF
 
 ADD  --link "src/tcl${TCL_VER}-src.tar.gz" .
-COPY --link "src/thread.patch" .
 
 RUN <<EOF
 set -ex
 cd tcl$TCL_VER
     cd pkgs
     rm -r itcl* tdbcodbc*
-    patch -d thread* -Np1 -i /src/thread.patch
 
     cd ../unix
     ./configure \
@@ -86,8 +83,8 @@ EOF
 RUN <<EOF
 set -ex
 cd /opt/usr
-    cd    bin && ln -sf  tclsh${TCL_MAJOR}    tclsh
-    cd ../lib && ln -sf libtcl${TCL_MAJOR}.so libtcl.so
+    cd    bin && ln -sf  tclsh${TCL_VER%.*}    tclsh
+    cd ../lib && ln -sf libtcl${TCL_VER%.*}.so libtcl.so
     rm -r /opt/usr/share
 
     sed -e "s|'/usr'|'/opt/usr'|" \
@@ -124,7 +121,7 @@ EOF
 
 RUN <<EOF
 set -ex
-fossil get --dest tls https://core.tcl-lang.org/tcltls 1346b54b60c9d10c
+fossil get --dest tls https://core.tcl-lang.org/tcltls 225266f7674091df
 cd tls
     ./configure \
         --host=$SYSROOT --build=$BUILDHOST \
@@ -151,7 +148,8 @@ ADD "https://github.com/flightaware/tclreadline.git" tclreadline
 RUN <<EOF
 set -ex
 cd tclreadline
-    autoreconf -ivf
+    autoreconf -vif
+    libtoolize --install
     ./configure \
         --host=$SYSROOT --build=$BUILDHOST \
         --prefix=/usr \
@@ -159,11 +157,11 @@ cd tclreadline
         --without-tk ||cat config.log
 
     make
-    xx-clang $LDFLAGS -shared -fPIC -L/opt/usr/lib -ltcl9.0 -lreadline \
-        -o .libs/libtclreadline-2.4.1.so .libs/libtclreadline_la-tclreadline.o \
+    # xx-clang $LDFLAGS -shared -fPIC -L/opt/usr/lib -ltcl${TCL_VER%.*} -lreadline \
+    #     -o .libs/libtclreadline-2.5.0.so .libs/libtclreadline_la-tclreadline.o
 
     make DESTDIR=/opt install
-    mv /opt/usr/lib/libtclreadline* /opt/usr/lib/tclreadline2.4.1
+    # mv /opt/usr/lib/libtclreadline* /opt/usr/lib/tclreadline2.5.0
 EOF
 
 ADD "https://github.com/chpock/tclmtls.git" mtls
@@ -258,7 +256,7 @@ COPY --link --chmod=755 src/gen_ssl_cert.sh               /usr/bin/gen_ssl_cert_
 
 ENV PS1="\[\e[0;32m\]\u\[\e[0m\]:\[\e[0;34m\]\w\[\e[0m\]\$ "
 SHELL ["/bin/bash", "-c"]
-ARG TCL_MAJOR
+ARG TCL_VER
 
 RUN <<EOF
     PYTHON_VER=$(python -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
@@ -277,7 +275,7 @@ RUN <<EOF
         /usr/lib/*.a \
         /usr/lib/python$PYTHON_VER/{pydoc_data,ensurepip/_bundled,lib2to3} \
         /usr/lib/python$PYTHON_VER/encodings/{cp,euc,big,gb,mac}*.py \
-        /usr/lib/tcl$TCL_MAJOR/encoding/{cp,cns,euc,ksc,big,gb,*jis,mac}*.enc \
+        /usr/lib/tcl${TCL_VER%.*}/encoding/{cp,cns,euc,ksc,big,gb,*jis,mac}*.enc \
         /usr/lib/critcl-*/critcl_c/tcl8.{6,7} \
         /usr/sbin/{update-ca-*,rtcwake,rfkill} \
         /usr/share/{man,udhcpc} \
